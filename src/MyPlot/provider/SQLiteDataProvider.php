@@ -10,7 +10,7 @@ class SQLiteDataProvider extends DataProvider
 	/** @var \SQLite3 $db */
 	private $db;
 	/** @var \SQLite3Stmt */
-	private $sqlGetPlot, $sqlSavePlot, $sqlSavePlotById, $sqlRemovePlot, $sqlRemovePlotById, $sqlGetPlotsByOwner, $sqlGetPlotsByOwnerAndLevel, $sqlGetExistingXZ, $sqlMergePlots, $sqlUnmergeByPlots, $sqlGetMergedBase, $sqlGetMergedPlots;
+	private $sqlGetPlot, $sqlSavePlot, $sqlSavePlotById, $sqlRemovePlot, $sqlRemovePlotById, $sqlGetPlotsByOwner, $sqlGetPlotsByOwnerAndLevel, $sqlGetExistingXZ, $sqlMergePlots, $sqlUnmergeByConnected, $sqlUnmergeAllByBase, $sqlUnmergeAllByRoot, $sqlGetMergedPlotsByBase, $sqlGetMergedBaseFromConnected, $sqlGetAllMergedFromRoot;
 
 	/**
 	 * SQLiteDataProvider constructor.
@@ -25,7 +25,7 @@ class SQLiteDataProvider extends DataProvider
 			(id INTEGER PRIMARY KEY AUTOINCREMENT, level TEXT, X INTEGER, Z INTEGER, name TEXT,
 			 owner TEXT, helpers TEXT, denied TEXT, biome TEXT, pvp INTEGER);");
 		$this->db->exec("CREATE TABLE IF NOT EXISTS merges
-			(id INTEGER PRIMARY KEY AUTOINCREMENT, level TEXT, X1 INTEGER, Z1 INTEGER, X2 INTEGER UNIQUE, Z2 INTEGER UNIQUE);");
+			(baseId INTEGER PRIMARY KEY, connectedId INTEGER NOT NULL, rootId INTEGER NOT NULL);");
 		try{
 			$this->db->exec("ALTER TABLE plots ADD pvp INTEGER;");
 		}catch(\Exception $e) {
@@ -47,10 +47,15 @@ class SQLiteDataProvider extends DataProvider
 					(abs(Z) = :number AND abs(X) <= :number)
 				)
 			);");
-		$this->sqlMergePlots = $this->db->prepare("INSERT OR REPLACE INTO merges (level, X1, Z1, X2, Z2) VALUES (:level, :x1, :z1, :x2, :z2)");
-		$this->sqlUnmergeByPlots = $this->db->prepare("DELETE FROM merges WHERE level = :level AND X2 = :X AND Z2 = :Z;");
-		$this->sqlGetMergedBase = $this->db->prepare("SELECT * FROM merges WHERE level = :level AND X2 = :X and Z2 = :Z;");
-		$this->sqlGetMergedPlots = $this->db->prepare("SELECT * FROM merges WHERE level = :level AND X1 = :X and Z1 = :Z;");
+
+		$this->sqlMergePlots = $this->db->prepare("INSERT OR REPLACE INTO merges (baseId, connectedId, rootId) VALUES (:baseId, :connectedId, :rootId)");
+		$this->sqlUnmergeByConnected = $this->db->prepare("DELETE FROM merges WHERE connectedId = :connectedId;");
+		$this->sqlUnmergeAllByBase = $this->db->prepare("DELETE FROM merges WHERE baseId = :baseId;");
+		$this->sqlUnmergeAllByRoot = $this->db->prepare("DELETE FROM merges WHERE rootId = :rootId;");
+		$this->sqlGetMergedPlotsByBase = $this->db->prepare("SELECT * FROM merges JOIN plots WHERE baseId = :baseId AND id = connectedId;");
+		$this->sqlGetMergedBaseFromConnected = $this->db->prepare("SELECT * FROM merges JOIN plots WHERE connectedId = :connectedId AND baseId = id;");
+		$this->sqlGetAllMergedFromRoot = $this->db->prepare("SELECT * FROM merges JOIN plots WHERE rootId = :rootId AND connectedId = id;");
+
 		$this->plugin->getLogger()->debug("SQLite data provider registered");
 	}
 
@@ -187,12 +192,12 @@ class SQLiteDataProvider extends DataProvider
 	 */
 	public function mergePlots(Plot $base, Plot ...$plots) : bool {
 		foreach($plots as $plot) {
+			$root = ($root = $this->getMergeRoot($base)->id) === -1 ? $base->id : $root;
+
 			$stmt = $this->sqlMergePlots;
-			$stmt->bindValue(":level",$base->levelName, SQLITE3_TEXT);
-			$stmt->bindValue(":x1", $base->X, SQLITE3_INTEGER);
-			$stmt->bindValue(":z1", $base->Z, SQLITE3_INTEGER);
-			$stmt->bindValue(":x2", $plot->X, SQLITE3_INTEGER);
-			$stmt->bindValue(":z2", $plot->Z, SQLITE3_INTEGER);
+			$stmt->bindValue(":baseId", $base->id, SQLITE3_INTEGER);
+			$stmt->bindValue(":connectedId", $plot->id, SQLITE3_INTEGER);
+			$stmt->bindValue(":rootId", $root, SQLITE3_INTEGER);
 			$stmt->reset();
 			$result = $stmt->execute();
 			if($result === false) {
@@ -209,10 +214,8 @@ class SQLiteDataProvider extends DataProvider
 	 */
 	public function unMergePlots(Plot ...$plots) : bool {
 		foreach($plots as $plot) {
-			$stmt = $this->sqlUnmergeByPlots;
-			$stmt->bindValue(":level", $plot->levelName, SQLITE3_TEXT);
-			$stmt->bindValue(":X", $plot->X, SQLITE3_INTEGER);
-			$stmt->bindValue(":Z", $plot->Z, SQLITE3_INTEGER);
+			$stmt = $this->sqlUnmergeAllByRoot;
+			$stmt->bindValue(":rootId", $this->getMergeRoot($plot)->id, SQLITE3_INTEGER);
 			$stmt->reset();
 			$result = $stmt->execute();
 			if($result === false) {
@@ -230,17 +233,16 @@ class SQLiteDataProvider extends DataProvider
 	public function getMergedPlots(Plot $plot) : array {
 		/** @var Plot[] $plots */
 		$plots = [];
-		$stmt = $this->sqlGetMergedPlots;
-		$stmt->bindValue(":level", $plot->levelName, SQLITE3_TEXT);
-		$stmt->bindValue(":X", $plot->X, SQLITE3_INTEGER);
-		$stmt->bindValue(":Z", $plot->Z, SQLITE3_INTEGER);
+		$plot = $this->getMergeRoot($plot);
+		$stmt = $this->sqlGetAllMergedFromRoot;
+		$stmt->bindValue(":rootId", $plot->id, SQLITE3_INTEGER);
 		$stmt->reset();
 		$result = $stmt->execute();
 		if($result === false) {
-			return $this->getMergedPlots($this->getMergedBase($plot)); // recursion?
+			return $plots;
 		}
 		while($val = $result->fetchArray(SQLITE3_ASSOC)) {
-			$plots[] = $this->getPlot($val["level"], (int)$val["X1"], (int)$val["X2"]);
+			$plots[] = $this->getPlot($val["level"], (int)$val["X"], (int)$val["Z"]);
 		}
 		return $plots;
 	}
@@ -251,17 +253,28 @@ class SQLiteDataProvider extends DataProvider
 	 * @return Plot
 	 */
 	public function getMergedBase(Plot $plot) : Plot {
-		$stmt = $this->sqlGetMergedBase;
-		$stmt->bindValue(":level", $plot->levelName, SQLITE3_TEXT);
-		$stmt->bindValue(":X", $plot->X, SQLITE3_INTEGER);
-		$stmt->bindValue(":Z", $plot->Z, SQLITE3_INTEGER);
+		$stmt = $this->sqlGetMergedBaseFromConnected;
+		$stmt->bindValue(":connectedId", $plot->id, SQLITE3_INTEGER);
 		$stmt->reset();
 		$result = $stmt->execute();
 		if($result === false) {
 			return $plot; // base is the given plot
 		}
 		$val = $result->fetchArray(SQLITE3_ASSOC);
-		return $this->getPlot($val["level"], (int)$val["X1"], (int)$val["X2"]);
+		return $this->getPlot($val["level"], (int)$val["X"], (int)$val["Z"]);
+	}
+
+	/**
+	 * @param Plot $plot
+	 *
+	 * @return Plot
+	 */
+	public function getMergeRoot(Plot $plot) : Plot {
+		for ($id = $plot->id, $plot = $this->getMergedBase($plot); $plot->id === $id; $id = $plot->id) {
+			if($plot->id === $id)
+				return $plot;
+		}
+		return $plot;
 	}
 
 	/**
