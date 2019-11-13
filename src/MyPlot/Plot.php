@@ -2,6 +2,8 @@
 declare(strict_types=1);
 namespace MyPlot;
 
+use pocketmine\math\Vector3;
+
 class Plot
 {
 
@@ -136,6 +138,38 @@ class Plot
 		}
 		unset($this->denied[$key]);
 		return true;
+	}
+
+	/**
+	 * @param int $side
+	 * @param int $step
+	 *
+	 * @return Plot
+	 */
+	public function getSide(int $side, int $step = 1) : Plot {
+		$levelSettings = MyPlot::getInstance()->getLevelSettings($this->levelName);
+		$pos = MyPlot::getInstance()->getPlotPosition($this);
+		$sidePos = $pos->getSide($side, $step * ($levelSettings->plotSize + $levelSettings->roadWidth));
+		$sidePlot = MyPlot::getInstance()->getPlotByPosition($sidePos);
+		if($sidePlot === null) {
+			switch($side) {
+				case Vector3::SIDE_NORTH:
+					$sidePlot = new self($this->levelName, $this->X, $this->Z - $step);
+				break;
+				case Vector3::SIDE_SOUTH:
+					$sidePlot = new self($this->levelName, $this->X, $this->Z + $step);
+				break;
+				case Vector3::SIDE_WEST:
+					$sidePlot = new self($this->levelName, $this->X - $step, $this->Z);
+				break;
+				case Vector3::SIDE_EAST:
+					$sidePlot = new self($this->levelName, $this->X + $step, $this->Z);
+				break;
+				default:
+					return clone $this;
+			}
+		}
+		return $sidePlot;
 	}
 
 	/**
