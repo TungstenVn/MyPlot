@@ -192,7 +192,7 @@ class SQLiteDataProvider extends DataProvider
 	 */
 	public function mergePlots(Plot $base, Plot ...$plots) : bool {
 		foreach($plots as $plot) {
-			$root = ($root = $this->getMergeRoot($base)->id) === -1 ? $base->id : $root;
+			$root = ($root = $this->getMergedRoot($base)->id) === -1 ? $base->id : $root;
 
 			$stmt = $this->sqlMergePlots;
 			$stmt->bindValue(":baseId", $base->id, SQLITE3_INTEGER);
@@ -215,7 +215,7 @@ class SQLiteDataProvider extends DataProvider
 	public function unMergePlots(Plot ...$plots) : bool {
 		foreach($plots as $plot) {
 			$stmt = $this->sqlUnmergeAllByRoot;
-			$stmt->bindValue(":rootId", $this->getMergeRoot($plot)->id, SQLITE3_INTEGER);
+			$stmt->bindValue(":rootId", $this->getMergedRoot($plot)->id, SQLITE3_INTEGER);
 			$stmt->reset();
 			$result = $stmt->execute();
 			if($result === false) {
@@ -227,13 +227,27 @@ class SQLiteDataProvider extends DataProvider
 
 	/**
 	 * @param Plot $plot
+	 * @param bool $adjacent
 	 *
 	 * @return Plot[]
 	 */
-	public function getMergedPlots(Plot $plot) : array {
+	public function getMergedPlots(Plot $plot, bool $adjacent = false) : array {
 		/** @var Plot[] $plots */
 		$plots = [];
-		$plot = $this->getMergeRoot($plot);
+		if($adjacent) {
+			$stmt = $this->sqlGetMergedPlotsByBase;
+			$stmt->bindValue(":baseId", $plot->id, SQLITE3_INTEGER);
+			$stmt->reset();
+			$result = $stmt->execute();
+			if($result === false) {
+				return $plots;
+			}
+			while($val = $result->fetchArray(SQLITE3_ASSOC)) {
+				$plots[] = $this->getPlot($val["level"], (int)$val["X"], (int)$val["Z"]);
+			}
+			return $plots;
+		}
+		$plot = $this->getMergedRoot($plot);
 		$stmt = $this->sqlGetAllMergedFromRoot;
 		$stmt->bindValue(":rootId", $plot->id, SQLITE3_INTEGER);
 		$stmt->reset();
@@ -269,7 +283,7 @@ class SQLiteDataProvider extends DataProvider
 	 *
 	 * @return Plot
 	 */
-	public function getMergeRoot(Plot $plot) : Plot {
+	public function getMergedRoot(Plot $plot) : Plot {
 		for ($id = $plot->id, $plot = $this->getMergedBase($plot); $plot->id === $id; $id = $plot->id) {
 			if($plot->id === $id)
 				return $plot;

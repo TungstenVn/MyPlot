@@ -248,13 +248,15 @@ class MyPlot extends PluginBase
 			$Z = (int) ceil(($z - $plotSize + 1) / $totalSize);
 			$difZ = abs(($z - $plotSize + 1) % $totalSize);
 		}
+		$plot = $this->dataProvider->getPlot($levelName, $X, $Z);
 		if(($difX > $plotSize - 1) or ($difZ > $plotSize - 1)) {
-			if() { // TODO: check for merged plots around position
-				//
+			if(count($this->dataProvider->getMergedPlots($plot)) > 0) {
+				// TODO: check sides of nearest plot. if same root, return nearest plot
+				return $plot; // position is road with surrounding plots merged
 			}
 			return null; // this is the road and there are no plots here
 		}
-		return $this->dataProvider->getPlot($levelName, $X, $Z);
+		return $plot;
 	}
 
 	/**
@@ -319,19 +321,10 @@ class MyPlot extends PluginBase
 		/** @var Plot[] $toMerge */
 		$toMerge = [];
 		$mergedPlots = $this->getProvider()->getMergedPlots($plot);
-		$pos = $this->getPlotPosition($plot);
-		$nextPlotPos = $pos->getSide($direction, $plotLevel->plotSize);
-		$p = $this->getPlotByPosition($nextPlotPos);
-		if(!in_array($p, $mergedPlots)) {
-			$toMerge[] = $p;
-		}
-		foreach($mergedPlots as $mergedPlot) {
-			$pos = $this->getPlotPosition($mergedPlot);
-			$nextPlotPos = $pos->getSide($direction, $plotLevel->plotSize);
-			$p = $this->getPlotByPosition($nextPlotPos);
-			if(!in_array($p, $mergedPlots)) {
-				$toMerge[] = $p;
-			}
+		foreach($mergedPlots as $plot) {
+			$sidePlot = $plot->getSide($direction);
+			if($this->dataProvider->getMergedRoot($plot)->id !== $this->dataProvider->getMergedRoot($sidePlot)->id)
+				$toMerge[] = $sidePlot;
 		}
 		foreach($toMerge as $_) {
 			if($_->owner !== $plot->owner)
@@ -339,8 +332,8 @@ class MyPlot extends PluginBase
 		}
 		/** @var int $maxBlocksPerTick */
 		$maxBlocksPerTick = $this->getConfig()->get("ClearBlocksPerTick", 256);
-		$this->clearRoadsBetween($plot, $this->getFurthestMerge($plot, $toMerge), $maxBlocksPerTick);
-		return $this->getProvider()->mergePlots(...$toMerge);
+		$this->clearAllMergedPlotRoads($plot, $maxBlocksPerTick);
+		return $this->getProvider()->mergePlots($plot, ...$toMerge);
 	}
 
 	/**
@@ -349,41 +342,35 @@ class MyPlot extends PluginBase
 	 * @return bool
 	 */
 	public function isPlotMerged(Plot $plot) : bool {
-		$base = $this->dataProvider->getMergedBase($plot);
-		return $plot !== $base;
+		$base = $this->dataProvider->getMergedRoot($plot);
+		$root = $this->dataProvider->getMergedRoot($plot);
+		return ($plot->id !== $base->id and $plot->id !== $root->id);
 	}
 
 	/**
 	 * @param Plot $plot
 	 *
-	 * @param Plot[]|null $list if provided will use these plots instead of database
-	 *
-	 * @return Plot
-	 */
-	public function getFurthestMerge(Plot $plot, ?array $list = null) : Plot {
-		/** @var Plot $furthest */
-		$furthest = null;
-		if(empty($list)) {
-			// TODO: math
-			return $furthest;
-		}
-		// TODO: math
-		return $furthest;
-	}
-
-	/**
-	 * @param Plot $start
-	 * @param Plot $end
-	 *
 	 * @param int $maxBlocksPerTick
 	 *
 	 * @return bool
 	 */
-	public function clearRoadsBetween(Plot $start, Plot $end, int $maxBlocksPerTick = 256) : bool {
-		if(!$this->isLevelLoaded($start->levelName) or $start->levelName !== $end->levelName) {
+	public function clearAllMergedPlotRoads(Plot $plot, int $maxBlocksPerTick = 256) : bool {
+		if(!$this->isLevelLoaded($plot->levelName)) {
 			return false;
 		}
-		$this->getScheduler()->scheduleTask(new RoadFillTask($this, $start, $end, $maxBlocksPerTick));
+		$list = [];
+		foreach($this->dataProvider->getMergedPlots($plot) as $plot2) {
+			$adjacantPlots = $this->dataProvider->getMergedPlots($plot2, true);
+			foreach($adjacantPlots as $plot3) {
+				for($side = Vector3::SIDE_NORTH; $side <= Vector3::SIDE_EAST; ++$side) {
+					$plot4 = $plot3->getSide($side);
+					if($this->dataProvider->getMergedRoot($plot4)->id === $this->dataProvider->getMergedRoot($plot3)->id) {
+						$list[] = $plot4;
+					}
+				}
+			}
+		}
+		$this->getScheduler()->scheduleTask(new RoadFillTask($this, $list, $maxBlocksPerTick));
 		return true;
 	}
 
