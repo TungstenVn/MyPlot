@@ -39,8 +39,7 @@ before_script:
   - composer install
   - php -dphar.readonly=0 ./build/server-phar.php ./PocketMine-MP.phar
   - mkdir plugins
-  - cd tests/plugins/PocketMine-DevTools
-  - ls
+  - cd ${TRAVIS_BUILD_DIR}/../PocketMine-MP/tests/plugins/PocketMine-DevTools
   - php -dphar.readonly=0 ./src/DevTools/ConsoleScript.php --make ./ --relative ./ --out ../../../plugins/DevTools.phar
   - cd ../../..
   - cp ${TRAVIS_BUILD_DIR}/tests/PluginChecker.phar plugins/PluginChecker.phar
