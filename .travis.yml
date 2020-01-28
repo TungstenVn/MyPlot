@@ -47,7 +47,7 @@ before_script:
   - cd ${TRAVIS_BUILD_DIR}
   - chmod 777 ${TRAVIS_BUILD_DIR}/tests/travisScript.sh
   - chmod 777 ${TRAVIS_BUILD_DIR}/tests/lint.sh
-  - curl -sSLO https://github.com/phpstan/phpstan/releases/download/0.12.3/phpstan.phar
+  - curl -sSLO https://github.com/phpstan/phpstan/releases/download/0.12.8/phpstan.phar
   - curl https://phar.phpunit.de/phpunit-7.phar --silent --location -o phpunit.phar
 
 script:
