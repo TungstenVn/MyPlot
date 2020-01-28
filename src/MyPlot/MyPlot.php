@@ -533,7 +533,7 @@ class MyPlot extends PluginBase
 		}
 		foreach($this->getPlotChunks($plotTo) as $chunk) {
 			foreach($chunk->getEntities() as $entity) {
-				if($this->getPlotBB($plotTo)->isVectorInXZ($entity)) {
+				if($this->getPlotBB($plotTo)->isVectorInXZ($entity->getPosition())) {
 					if($entity instanceof Player){
 						$this->teleportPlayerToPlot($entity, $plotTo);
 					}
@@ -610,7 +610,7 @@ class MyPlot extends PluginBase
 		}
 		$maxBlocksPerTick = $ev->getMaxBlocksPerTick();
 		foreach($this->getServer()->getWorldManager()->getWorldByName($plot->levelName)->getEntities() as $entity) {
-			if($this->getPlotBB($plot)->isVectorInXZ($entity)) {
+			if($this->getPlotBB($plot)->isVectorInXZ($entity->getPosition())) {
 				if(!$entity instanceof Player) {
 					$entity->flagForDespawn();
 				}else{
