@@ -3,7 +3,7 @@ parameters:
 		- src
 	level: 7
 	autoload_files:
-		- phar://%currentWorkingDirectory%/../PocketMine/PocketMine-MP.phar/vendor/autoload.php
+		- phar://%currentWorkingDirectory%/../PocketMine-MP/PocketMine-MP.phar/vendor/autoload.php
 	autoload_directories:
 		- src
 	reportUnmatchedIgnoredErrors: false
