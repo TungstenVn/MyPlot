@@ -9,14 +9,12 @@ before_script:
   - mv leveldb-mcpe-$LEVELDB_VERSION leveldb-mcpe
   - cd leveldb-mcpe && make -j4 && mv out-shared/libleveldb.* . && cd ..
   - git clone https://github.com/reeze/php-leveldb.git leveldb
-  - cd leveldb
-  - git checkout 9bcae79f71b81a5c3ea6f67e45ae9ae9fb2775a5
+  - cd leveldb && git checkout 9bcae79f71b81a5c3ea6f67e45ae9ae9fb2775a5
   - phpize
   - ./configure --with-leveldb=../leveldb-mcpe && make && make install
   - cd ..
   - git clone https://github.com/pmmp/ext-chunkutils2.git chunkutils
-  - cd chunkutils
-  - git checkout d8d762a597ac0da6f333f862096d6af0e6286b75
+  - cd chunkutils && git checkout d8d762a597ac0da6f333f862096d6af0e6286b75
   - phpize
   - ./configure && make && make install
   - cd ..
@@ -41,7 +39,8 @@ before_script:
   - composer install
   - php -dphar.readonly=0 ./build/server-phar.php ./PocketMine-MP.phar
   - mkdir plugins
-  - cd tests/plugins/PocketMine-DevTools && ls
+  - cd tests/plugins/PocketMine-DevTools
+  - ls
   - php -dphar.readonly=0 ./src/DevTools/ConsoleScript.php --make ./ --relative ./ --out ../../../plugins/DevTools.phar
   - cd ../../..
   - cp ${TRAVIS_BUILD_DIR}/tests/PluginChecker.phar plugins/PluginChecker.phar
