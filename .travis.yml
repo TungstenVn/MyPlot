@@ -36,20 +36,16 @@ before_script:
   - echo "extension=pthreads.so" >> ~/.phpenv/versions/$(phpenv version-name)/etc/php.ini
   - echo "extension=chunkutils2.so" >> ~/.phpenv/versions/$(phpenv version-name)/etc/php.ini
   - echo "extension=leveldb.so" >> ~/.phpenv/versions/$(phpenv version-name)/etc/php.ini
-  - cd ${TRAVIS_BUILD_DIR}/..
-  - git clone https://github.com/pmmp/PocketMine-MP.git
-  - cd PocketMine-MP
-  - git branch master origin/master
+  - cd ${TRAVIS_BUILD_DIR}/.. && git clone https://github.com/pmmp/PocketMine-MP.git
+  - cd PocketMine-MP && git branch master origin/master
   - composer install
-  - cd tests/plugins/PocketMine-DevTools
-  - php -dphar.readonly=0 ./src/DevTools/ConsoleScript.php --make ./ --relative ./ --out ../../../DevTools.phar
-  - cd ../../..
   - php -dphar.readonly=0 ./build/server-phar.php ./PocketMine-MP.phar
   - mkdir plugins
-  - mv DevTools.phar plugins
+  - cd tests/plugins/PocketMine-DevTools && ls
+  - php -dphar.readonly=0 ./src/DevTools/ConsoleScript.php --make ./ --relative ./ --out ../../../plugins/DevTools.phar
+  - cd ../../..
   - cp ${TRAVIS_BUILD_DIR}/tests/PluginChecker.phar plugins/PluginChecker.phar
-  - mkdir unstaged
-  - php ${TRAVIS_BUILD_DIR}/tests/travisPluginTest.php unstaged
+  - mkdir unstaged && php ${TRAVIS_BUILD_DIR}/tests/travisPluginTest.php unstaged
   - cd ${TRAVIS_BUILD_DIR}
   - chmod 777 ${TRAVIS_BUILD_DIR}/tests/travisScript.sh
   - chmod 777 ${TRAVIS_BUILD_DIR}/tests/lint.sh
