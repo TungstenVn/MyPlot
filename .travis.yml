@@ -34,8 +34,8 @@ before_script:
   - echo "extension=pthreads.so" >> ~/.phpenv/versions/$(phpenv version-name)/etc/php.ini
   - echo "extension=chunkutils2.so" >> ~/.phpenv/versions/$(phpenv version-name)/etc/php.ini
   - echo "extension=leveldb.so" >> ~/.phpenv/versions/$(phpenv version-name)/etc/php.ini
-  - cd ${TRAVIS_BUILD_DIR}/.. && git clone https://github.com/pmmp/PocketMine-MP.git
-  - cd PocketMine-MP && git branch master origin/master
+  - cd ${TRAVIS_BUILD_DIR}/.. && git clone --single-branch --branch master --recursive https://github.com/pmmp/PocketMine-MP.git
+  - cd PocketMine-MP
   - composer install
   - php -dphar.readonly=0 ./build/server-phar.php ./PocketMine-MP.phar
   - mkdir plugins
