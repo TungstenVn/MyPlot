@@ -29,6 +29,7 @@ use pocketmine\block\BlockFactory;
 use pocketmine\block\BlockLegacyIds;
 use pocketmine\event\world\WorldLoadEvent;
 use pocketmine\lang\Language;
+use pocketmine\math\Facing;
 use pocketmine\player\Player;
 use pocketmine\world\biome\Biome;
 use pocketmine\world\format\Chunk;
@@ -292,11 +293,11 @@ class MyPlot extends PluginBase
 	public function isPositionBorderingPlot(Position $position) : bool {
 		if(!$position->isValid())
 			return false;
-		for($i = Vector3::SIDE_NORTH; $i <= Vector3::SIDE_EAST; ++$i) {
+		foreach(Facing::HORIZONTAL as $i) {
 			$pos = $position->getSide($i);
 			$x = $pos->x;
 			$z = $pos->z;
-			$levelName = $pos->level->getFolderName();
+			$levelName = $pos->getWorld()->getFolderName();
 
 			$plotLevel = $this->getLevelSettings($levelName);
 			if($plotLevel === null)
@@ -325,14 +326,14 @@ class MyPlot extends PluginBase
 			if($plot !== null)
 				return true;
 		}
-		for($i = Vector3::SIDE_NORTH; $i <= Vector3::SIDE_EAST; ++$i) {
-			for($n = Vector3::SIDE_NORTH; $n <= Vector3::SIDE_EAST; ++$n) {
-				if($i === $n or Vector3::getOppositeSide($i) === $n)
+		foreach(Facing::HORIZONTAL as $i) {
+			foreach(Facing::HORIZONTAL as $n) {
+				if($i === $n or Facing::opposite($i) === $n)
 					continue;
 				$pos = $position->getSide($i)->getSide($n);
 				$x = $pos->x;
 				$z = $pos->z;
-				$levelName = $pos->level->getFolderName();
+				$levelName = $pos->getWorld()->getFolderName();
 
 				$plotLevel = $this->getLevelSettings($levelName);
 				if($plotLevel === null)
@@ -377,11 +378,11 @@ class MyPlot extends PluginBase
 	public function getPlotBorderingPosition(Position $position) : ?Plot {
 		if(!$position->isValid())
 			return null;
-		for($i = Vector3::SIDE_NORTH; $i <= Vector3::SIDE_EAST; ++$i) {
+		foreach(Facing::HORIZONTAL as $i) {
 			$pos = $position->getSide($i);
 			$x = $pos->x;
 			$z = $pos->z;
-			$levelName = $pos->level->getFolderName();
+			$levelName = $pos->getWorld()->getFolderName();
 
 			$plotLevel = $this->getLevelSettings($levelName);
 			if($plotLevel === null)
@@ -552,7 +553,7 @@ class MyPlot extends PluginBase
 		$plotLevel = $this->getLevelSettings($plotFrom->levelName);
 		$plotSize = $plotLevel->plotSize-1;
 		$plotBeginPos = $this->getPlotPosition($plotFrom);
-		$level = $plotBeginPos->level;
+		$level = $plotBeginPos->getWorld();
 		$plotBeginPos = $plotBeginPos->subtract(1, 0, 1);
 		$plotBeginPos->y = 0;
 		$plugin = $this;
@@ -569,7 +570,7 @@ class MyPlot extends PluginBase
 		$plotLevel = $this->getLevelSettings($plotTo->levelName);
 		$plotSize = $plotLevel->plotSize-1;
 		$plotBeginPos = $this->getPlotPosition($plotTo);
-		$level = $plotBeginPos->level;
+		$level = $plotBeginPos->getWorld();
 		$plotBeginPos = $plotBeginPos->subtract(1, 0, 1);
 		$plotBeginPos->y = 0;
 		$selection->setPosition(1, $plotBeginPos);
@@ -671,7 +672,7 @@ class MyPlot extends PluginBase
 			});
 			$styler->removeSelection(99998);
 			foreach($this->getPlotChunks($plot) as $chunk) {
-				$plotBeginPos->level->setChunk($chunk->getX(), $chunk->getZ(), $chunk, false);
+				$plotBeginPos->getWorld()->setChunk($chunk->getX(), $chunk->getZ(), $chunk, false);
 			}
 			$this->getScheduler()->scheduleDelayedTask(new ClearBorderTask($this, $plot), 1);
 			return true;
@@ -1036,7 +1037,7 @@ class MyPlot extends PluginBase
 	}
 
 	public function onEnable() : void {
-		SpoonDetector::printSpoon($this, "spoon.txt");
+		//SpoonDetector::printSpoon($this, "spoon.txt");
 		if($this->isDisabled()) {
 			return;
 		}
