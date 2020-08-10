@@ -20,6 +20,7 @@ use pocketmine\event\level\LevelUnloadEvent;
 use pocketmine\event\Listener;
 use pocketmine\event\player\PlayerInteractEvent;
 use pocketmine\event\player\PlayerMoveEvent;
+use pocketmine\item\Food;
 use pocketmine\level\Level;
 use pocketmine\Player;
 use pocketmine\utils\Config;
@@ -111,6 +112,8 @@ class EventListener implements Listener
 	 * @param PlayerInteractEvent $event
 	 */
 	public function onPlayerInteract(PlayerInteractEvent $event) : void {
+		if($event->getAction() === PlayerInteractEvent::RIGHT_CLICK_AIR and $event->getItem() instanceof Food)
+			return;
 		$this->onEventOnBlock($event);
 	}
 
@@ -239,6 +242,7 @@ class EventListener implements Listener
 		}
 	}
 
+<<<<<<< HEAD
 	/**
 	 * @ignoreCancelled false
 	 * @priority LOWEST
@@ -253,11 +257,63 @@ class EventListener implements Listener
 		if(!$this->plugin->isLevelLoaded($levelName))
 			return;
 		$settings = $this->plugin->getLevelSettings($levelName);
-		if(!$settings->updatePlotLiquids) {
+		if(!$settings->updatePlotLiquids and ($this->plugin->getPlotByPosition($event->getBlock()) instanceof Plot or $this->plugin->getPlotByPosition($event->getSource()) instanceof Plot or $this->plugin->isPositionBorderingPlot($event->getBlock()) or $this->plugin->isPositionBorderingPlot($event->getSource()))) {
 			$event->setCancelled();
 			$this->plugin->getLogger()->debug("Cancelled block spread of {$event->getBlock()->getName()} on " . $levelName);
 		}
 	}
+=======
+    /**
+     * @param PlayerMoveEvent|EntityTeleportEvent $event
+     */
+    private function onEnterPlotCheck(Player $player, $event): void
+    {
+        $levelName = $player->getLevel()->getFolderName();
+        if (!$this->plugin->isLevelLoaded($levelName))
+            return;
+        $plot = $this->plugin->getPlotByPosition($event->getTo());
+        $plotFrom = $this->plugin->getPlotByPosition($event->getFrom());
+        if ($plot !== null and ($plotFrom === null or !$plot->isSame($plotFrom))) {
+            if (strpos((string)$plot, "-0")) {
+                return;
+            }
+            $ev = new MyPlotPlayerEnterPlotEvent($plot, $player);
+            $ev->setCancelled($event->isCancelled());
+            $username = $player->getName();
+            if ($plot->owner !== $username and ($plot->isDenied($username) or $plot->isDenied("*")) and !$player->hasPermission("myplot.admin.denyplayer.bypass")) {
+                $ev->setCancelled();
+            }
+            $ev->call();
+            if ($event->isCancelled()) {
+                return;
+            }
+            if (!$this->plugin->getConfig()->get("ShowPlotPopup", true))
+                return;
+            $popup = $this->plugin->getLanguage()->translateString("popup", [TextFormat::GREEN . $plot]);
+            if (!empty($plot->owner)) {
+                $owner = TextFormat::GREEN . $plot->owner;
+                $ownerPopup = $this->plugin->getLanguage()->translateString("popup.owner", [$owner]);
+            } else {
+                $ownerPopup = $this->plugin->getLanguage()->translateString("popup.available");
+            }
+            $paddingSize = (int)floor((strlen($popup) - strlen($ownerPopup)) / 2);
+            $paddingPopup = str_repeat(" ", max(0, -$paddingSize));
+            $paddingOwnerPopup = str_repeat(" ", max(0, $paddingSize));
+            $popup = TextFormat::WHITE . $paddingPopup . $popup . "\n" . TextFormat::WHITE . $paddingOwnerPopup . $ownerPopup;
+            $player->sendTip($popup);
+        } elseif ($plotFrom !== null and ($plot === null or !$plot->isSame($plotFrom))) {
+            if (strpos((string)$plotFrom, "-0")) {
+                return;
+            }
+            $ev = new MyPlotPlayerLeavePlotEvent($plotFrom, $player);
+            $ev->setCancelled($event->isCancelled());
+            $ev->call();
+            $event->setCancelled($ev->isCancelled());
+        } elseif ($plotFrom !== null and $plot !== null and ($plot->isDenied($player->getName()) or $plot->isDenied("*")) and $plot->owner !== $player->getName() and !$player->hasPermission("myplot.admin.denyplayer.bypass")) {
+            $this->plugin->teleportPlayerToPlot($player, $plot, false);
+        }
+    }
+>>>>>>> 56ae263e9954c19da8c9e8de79e6ca0f80edf968
 
 	/**
 	 * @ignoreCancelled false
@@ -308,6 +364,8 @@ class EventListener implements Listener
 			$ev->setCancelled($event->isCancelled());
 			$ev->call();
 			$event->setCancelled($ev->isCancelled());
+		}elseif($plotFrom !== null and $plot !== null and ($plot->isDenied($event->getPlayer()->getName()) or $plot->isDenied("*")) and $plot->owner !== $event->getPlayer()->getName() and !$event->getPlayer()->hasPermission("myplot.admin.denyplayer.bypass")) {
+			$this->plugin->teleportPlayerToPlot($event->getPlayer(), $plot, false);
 		}
 	}
 
